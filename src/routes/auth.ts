@@ -16,6 +16,7 @@ authRouter.post("/register", async (req, res) => {
   }
 
   try {
+    
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     // Save user in PostgreSQL
