@@ -2,10 +2,12 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../db";
+import dotenv from "dotenv";   // ✅ load env
+dotenv.config();
 
 const authRouter = Router();
-const JWT_SECRET = "your-secret-key"; // ⚠️ use an environment variable in production
-const SALT_ROUNDS = 10; // between 8–12 as you required
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret"; // ✅ safe fallback
+const SALT_ROUNDS = 10;
 
 // Register route
 authRouter.post("/register", async (req, res) => {
@@ -16,10 +18,8 @@ authRouter.post("/register", async (req, res) => {
   }
 
   try {
-    
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Save user in PostgreSQL
     await pool.query(
       "INSERT INTO users (username, password) VALUES ($1, $2)",
       [username, hashedPassword]
@@ -27,7 +27,7 @@ authRouter.post("/register", async (req, res) => {
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("Register error:", err);
     res.status(500).json({ message: "Error registering user" });
   }
 });
@@ -51,6 +51,8 @@ authRouter.post("/login", async (req, res) => {
     }
 
     const user = result.rows[0];
+    console.log("DB user:", user); // ✅ debug
+
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
@@ -58,13 +60,15 @@ authRouter.post("/login", async (req, res) => {
     }
 
     // Generate JWT
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
-    res.json({ token });
+    res.json({ token, user: { id: user.id, username: user.username } });
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
     res.status(500).json({ message: "Error logging in" });
   }
 });
